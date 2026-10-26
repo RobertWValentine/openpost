@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Facebook and Instagram direct messages keep their times. Graph returns `created_time` and `updated_time` with an offset without a colon (`+0000`), which the messaging adapters rejected, so every collected message was stored in the year 1 and no reply window was recorded.
 - Self-hosted instance administrators can record certification evidence for Telegram bot publishing. Recording derived the expected contract from the managed-production flag, while readiness decisions and the certification context derived it from the provider's mandatory certification policy, so every Telegram, Pinterest and Google Business Profile evidence append on a self-hosted instance was rejected with "provider readiness evidence was rejected". Both paths now share one contract derivation.
 
 ## [7.31.1] - 2026-10-26

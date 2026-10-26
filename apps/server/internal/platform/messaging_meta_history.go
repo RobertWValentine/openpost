@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"time"
 )
 
 type metaMessageView struct {
@@ -35,7 +34,8 @@ type metaMessageView struct {
 }
 
 func (m metaMessageView) provider(accountID string) ProviderMessage {
-	at, _ := time.Parse(time.RFC3339, m.CreatedTime)
+	// Graph returns offsets without a colon, such as 2026-10-26T21:01:00+0000.
+	at := nativePostTime(m.CreatedTime)
 	direction := "inbound"
 	if m.From.ID == accountID {
 		direction = "outbound"
