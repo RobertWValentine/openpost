@@ -32,6 +32,21 @@ func TestMetaConversationsParseGraphTimestamps(t *testing.T) {
 	require.True(t, conversation.ReplyWindowExpiresAt.Equal(inbound.Add(24*time.Hour)))
 }
 
+func TestMetaConversationUsesUpdatedTimeWithoutMessages(t *testing.T) {
+	previous := httpClient
+	t.Cleanup(func() { httpClient = previous })
+	httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return jsonResponse(r, `{"data":[{"id":"c1","updated_time":"2026-10-26T21:05:00+0000",
+			"participants":{"data":[{"id":"me","username":"brand"},{"id":"alice","username":"alice"}]},
+			"messages":{"data":[]}}]}`), nil
+	})}
+	result, err := NewInstagramAdapter("", "", "").FetchMessages(t.Context(), "secret", FetchMessagesRequest{AccountID: "me"})
+	require.NoError(t, err)
+	require.Len(t, result.Conversations, 1)
+	require.Empty(t, result.Conversations[0].Messages)
+	require.True(t, result.Conversations[0].LastMessageAt.Equal(time.Date(2026, 10, 26, 21, 5, 0, 0, time.UTC)))
+}
+
 func TestMetaHistoryParsesGraphTimestamps(t *testing.T) {
 	previous := httpClient
 	t.Cleanup(func() { httpClient = previous })
