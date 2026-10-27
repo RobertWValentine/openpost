@@ -37,6 +37,7 @@ type metaMessageView struct {
 	// with an empty message, not as attachments.
 	Shares struct {
 		Data []struct {
+			URL  string `json:"url"`
 			Link string `json:"link"`
 			Name string `json:"name"`
 		} `json:"data"`
@@ -51,6 +52,9 @@ type metaMessageView struct {
 	} `json:"story"`
 }
 
+// metaMessageFields is shared by the conversation and history reads. Shared
+// posts and story replies or mentions arrive in their own fields beside a
+// message without text, so they must be requested to show any content.
 const metaMessageFields = "id,from,message,created_time,attachments,shares,story"
 
 func (m metaMessageView) provider(accountID string) ProviderMessage {
@@ -76,8 +80,11 @@ func (m metaMessageView) provider(accountID string) ProviderMessage {
 		result.Attachments = append(result.Attachments, MessageAttachment{Type: kind, URL: remote, Name: attachment.Name, MimeType: attachment.MimeType})
 	}
 	for _, share := range m.Shares.Data {
-		if share.Link != "" {
-			result.Attachments = append(result.Attachments, MessageAttachment{Type: "share", URL: share.Link, Name: share.Name})
+		// Graph documents a share's url; some platforms and older payloads
+		// return link instead.
+		link := firstNonEmptyString(share.URL, share.Link)
+		if link != "" {
+			result.Attachments = append(result.Attachments, MessageAttachment{Type: "share", URL: link, Name: share.Name})
 		}
 	}
 	if m.Story.Mention.Link != "" {

@@ -69,3 +69,14 @@ func TestMetaAttachmentKeepsLegacyImageSrcAndMimeType(t *testing.T) {
 		{"mime_type":"image/png","image_data":{"src":"https://cdn.example/src.png"}}]}}`), &message))
 	require.Equal(t, []MessageAttachment{{Type: "image", URL: "https://cdn.example/src.png", MimeType: "image/png"}}, message.provider("me").Attachments)
 }
+
+func TestMetaShareUsesDocumentedURLAndLegacyLink(t *testing.T) {
+	var message metaMessageView
+	require.NoError(t, json.Unmarshal([]byte(`{"id":"m1","shares":{"data":[
+		{"url":"https://www.instagram.com/p/abc/","name":"A shared post"},
+		{"link":"https://www.instagram.com/reel/def/"}]}}`), &message))
+	require.Equal(t, []MessageAttachment{
+		{Type: "share", URL: "https://www.instagram.com/p/abc/", Name: "A shared post"},
+		{Type: "share", URL: "https://www.instagram.com/reel/def/"},
+	}, message.provider("me").Attachments)
+}
