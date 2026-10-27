@@ -24,6 +24,7 @@ type metaMessageView struct {
 			MimeType string `json:"mime_type"`
 			Name     string `json:"name"`
 			Image    struct {
+				URL string `json:"url"`
 				Src string `json:"src"`
 			} `json:"image_data"`
 			Video struct {
@@ -32,7 +33,25 @@ type metaMessageView struct {
 			FileURL string `json:"file_url"`
 		} `json:"data"`
 	} `json:"attachments"`
+	// Shared posts and story replies or mentions come back as separate fields
+	// with an empty message, not as attachments.
+	Shares struct {
+		Data []struct {
+			Link string `json:"link"`
+			Name string `json:"name"`
+		} `json:"data"`
+	} `json:"shares"`
+	Story struct {
+		Mention struct {
+			Link string `json:"link"`
+		} `json:"mention"`
+		ReplyTo struct {
+			Link string `json:"link"`
+		} `json:"reply_to"`
+	} `json:"story"`
 }
+
+const metaMessageFields = "id,from,message,created_time,attachments,shares,story"
 
 func (m metaMessageView) provider(accountID string) ProviderMessage {
 	at, _ := time.Parse(time.RFC3339, m.CreatedTime)
@@ -42,10 +61,30 @@ func (m metaMessageView) provider(accountID string) ProviderMessage {
 	}
 	result := ProviderMessage{ID: m.ID, Direction: direction, AuthorRemoteID: m.From.ID, Body: m.Message, RemoteCreatedAt: at}
 	for _, attachment := range m.Attachments.Data {
-		remote := firstNonEmptyString(attachment.Image.Src, attachment.Video.URL, attachment.FileURL)
-		if remote != "" {
-			result.Attachments = append(result.Attachments, MessageAttachment{Type: metaAttachmentType(attachment.MimeType), URL: remote, Name: attachment.Name, MimeType: attachment.MimeType})
+		// Graph puts the image URL in image_data.url and often omits mime_type.
+		image := firstNonEmptyString(attachment.Image.URL, attachment.Image.Src)
+		remote := firstNonEmptyString(image, attachment.Video.URL, attachment.FileURL)
+		if remote == "" {
+			continue
 		}
+		kind := metaAttachmentType(attachment.MimeType)
+		if attachment.MimeType == "" && image != "" {
+			kind = "image"
+		} else if attachment.MimeType == "" && attachment.Video.URL != "" {
+			kind = "video"
+		}
+		result.Attachments = append(result.Attachments, MessageAttachment{Type: kind, URL: remote, Name: attachment.Name, MimeType: attachment.MimeType})
+	}
+	for _, share := range m.Shares.Data {
+		if share.Link != "" {
+			result.Attachments = append(result.Attachments, MessageAttachment{Type: "share", URL: share.Link, Name: share.Name})
+		}
+	}
+	if m.Story.Mention.Link != "" {
+		result.Attachments = append(result.Attachments, MessageAttachment{Type: "story_mention", URL: m.Story.Mention.Link})
+	}
+	if m.Story.ReplyTo.Link != "" {
+		result.Attachments = append(result.Attachments, MessageAttachment{Type: "story_reply", URL: m.Story.ReplyTo.Link})
 	}
 	return result
 }
@@ -62,7 +101,7 @@ func (m metaMessagingAdapter) history(ctx context.Context, token string, input F
 	if limit <= 0 || limit > 100 {
 		limit = 100
 	}
-	query := url.Values{"limit": {fmt.Sprint(limit)}, "fields": {"id,from,message,created_time,attachments"}}
+	query := url.Values{"limit": {fmt.Sprint(limit)}, "fields": {metaMessageFields}}
 	if input.Cursor != "" {
 		query.Set("after", input.Cursor)
 	}

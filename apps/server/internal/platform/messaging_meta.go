@@ -72,7 +72,7 @@ func (i *InstagramAdapter) messagingAdapter() metaMessagingAdapter {
 func (m metaMessagingAdapter) conversationsQuery(token, cursor string) url.Values {
 	query := url.Values{
 		"platform":     {m.platformParam},
-		"fields":       {"participants,updated_time,messages.limit(100){id,from,message,created_time,attachments}"},
+		"fields":       {"participants,updated_time,messages.limit(100){" + metaMessageFields + "}"},
 		"limit":        {"50"},
 		"access_token": {token},
 	}
